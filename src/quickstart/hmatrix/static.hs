@@ -160,121 +160,121 @@ import Numeric.LinearAlgebra.Static
 --  [ 5.0, 4.0
 --  , 3.0, 4.0 ] :: L 2 2)
 
--- PENDING 325-338
--- >>> import Numeric.LinearAlgebra.HMatrix (Seed, RandDist(..), randomVector, rand)
--- >>> let a' = ((2><3) . repeat) 1     -- inplace mutation not useful here
--- >>> let rand' seed r c = reshape c (randomVector seed Uniform (r*c))
--- >>> let b' = rand' 1 2 3             -- or unseeded: rand 2 3; rand' not actually deterministic (?)
--- >>> let a = cmap (*3) a' :: Matrix Z -- haskell cannot reassign variables using itself
+-- | 325-338
+-- >>> let a' = konst 1 :: L 2 3      -- inplace mutation not useful here
+-- >>> :set -XRankNTypes
+-- >>> b' <- rand :: IO (L 2 3)             -- rand 2 3; non-deterministic rand'
+-- >>> let b' = withRows (replicate 2 (randomVector 1 Uniform)) (fromJust . exactDims :: forall m . KnownNat m => L m 3 -> L 2 3)
+-- >>> let a = dmmap (*3) a'                -- haskell cannot reassign variables using itself
 -- >>> a
+-- (3.0 :: L 2 3)
+-- >>> extract a
 -- (2><3)
---  [ 3, 3, 3
---  , 3, 3, 3 ]
--- >>> let b = (+ (fromZ a)) b'         -- need to cast away from integer (Z)
--- >>> disp 7 b                         -- unseeded would need fmap due to being IO (...)
--- ...
+--  [ 3.0, 3.0, 3.0
+--  , 3.0, 3.0, 3.0 ]
+-- >>> let b = b' + a          -- need to cast away from integer (Z)
+-- >>> disp 7 b                -- unseeded would need fmap due to being IO (...)
+-- L 2 3
+-- 3.0856361  3.4188668  3.3631069
+-- 3.0856361  3.4188668  3.3631069
 
--- 2x3
---  3.4583777  3.1595528  3.4802844
---  3.6986673  3.8688027  3.5846251
-
--- PENDING 346-360
--- >>> :set -XFlexibleContexts
--- >>> let a = konst 1 3                -- type not resolved here
--- >>> let b = linspace 3 (0, pi)       -- set FlexibleContexts to get type inference
+-- | 346-360
+-- >>> let a = konst 1 :: R 3             -- type not resolved here
+-- >>> let b = linspace (0, pi) :: R 3    -- set FlexibleContexts to get type inference
 -- >>> :t b
--- b :: (Container Vector e, Floating e) => Vector e
--- >>> let c = a + b :: Vector R        -- we can force resolving type of only c
--- >>> disp 8 (asRow (c :: Vector R)) -- a and b will remain unresolved
--- 1x3
+-- b :: R 3
+-- >>> let c = a + b :: R 3           -- we can force resolving type of only c
+-- >>> disp 8 c                       -- a and b will remain unresolved
+-- R 3
 -- 1.00000000  2.57079633  4.14159265
 -- >>> :t c
--- c :: Vector R
--- >>> let d = cmap (exp . (*iC)) (complex c)
--- >>> putStrLn (dispcf 8 (asRow d))
+-- c :: R 3
+-- >>> let cComplex = fromJust . create . LA.complex . extract $ c :: C 3
+-- >>> let d = dvmap (exp . (*LA.iC)) cComplex
+-- >>> putStrLn (LA.dispcf 8 (LA.asRow (extract d)))
 -- 1x3
 -- 0.54030231+0.84147098i  -0.84147098+0.54030231i  -0.54030231-0.84147098i
 -- <BLANKLINE>
 -- >>> :t d
--- d :: Vector C
+-- d :: C 3
 
--- >>> let a = rand' 1 2 3
--- PENDING 367-376
--- >>> let rand' seed r c = reshape c (randomVector seed Uniform (r*c))
--- >>> let a = fromLists [[0.18626021, 0.34556073, 0.39676747], [0.53881673, 0.41919451, 0.6852195]] :: Matrix R
+-- | 367-376
+-- >>> let rand' seed m = withRows (replicate m (randomVector 1 Uniform)) (fromJust . exactDims :: forall m . KnownNat m => L m 3 -> L 2 3)
+-- >>> let a = rand' 1 2
 -- >>> a
--- (2><3)
---  [ 0.18626021, 0.34556073, 0.39676747
---  , 0.53881673, 0.41919451,  0.6852195 ]
--- >>> sumElements a :: R
--- 2.57181915
--- >>> minElement a :: R
--- 0.18626021
--- >>> maxElement a :: R
--- 0.6852195
+-- (matrix
+--  [ 8.563611381018353e-2, 0.41886683712660655, 0.36310692008729417
+--  , 8.563611381018353e-2, 0.41886683712660655, 0.36310692008729417 ] :: L 2 3)
+-- >>> LA.sumElements (extract a) :: Double
+-- 1.7352197420481685
+-- >>> LA.minElement (extract a) :: Double
+-- 8.563611381018353e-2
+-- >>> LA.maxElement (extract a) :: Double
+-- 0.41886683712660655
 
--- PENDING 383-398
--- >>> let b = (3><4) [0::I ..]
+-- | 383-398
+-- >>> let b = build (\x y -> y + fromIntegral (truncate x `mod` 4) * 4) :: L 3 4
 -- >>> b
--- (3><4)
---  [ 0, 1,  2,  3
---  , 4, 5,  6,  7
---  , 8, 9, 10, 11 ]
---  >>> (fromList . fmap sumElements . toColumns) b
---  [12,15,18,21]
---  >>> (fromList . fmap minElement . toRows) b
---  [0,4,8]
---  >>> (fromLists . (fmap (scanl1 (+))) . toLists) b
---  (3><4)
---   [ 0,  1,  3,  6
---   , 4,  9, 15, 22
---   , 8, 17, 27, 38 ]
+-- (matrix
+--  [ 0.0, 1.0,  2.0,  3.0
+--  , 4.0, 5.0,  6.0,  7.0
+--  , 8.0, 9.0, 10.0, 11.0 ] :: L 3 4)
+--  >>> (fmap (LA.sumElements . extract) . toColumns) b
+--  [12.0,15.0,18.0,21.0]
+--  >>> (fmap (LA.minElement . extract) . toRows) b
+--  [0.0,4.0,8.0]
+--  >>> (create . LA.fromLists . (fmap (scanl1 (+))) . LA.toLists . extract) b :: Maybe (L 3 4)
+--  Just (matrix
+--   [ 0.0,  1.0,  3.0,  6.0
+--   , 4.0,  9.0, 15.0, 22.0
+--   , 8.0, 17.0, 27.0, 38.0 ] :: L 3 4)
 
--- PENDING 411-420
--- >>> let b = 3 |> [0::R ..] -- if we used @I@, we'd need @fromInt b@ below
--- >>> b
+-- | 411-420
+-- >>> let b = vector [0..2] :: R 3 -- if we used @I@, we'd need @fromInt b@ below
+-- >>> extract b
 -- [0.0,1.0,2.0]
--- >>> cmap exp b
--- [1.0,2.718281828459045,7.38905609893065]
--- >>> cmap sqrt b
+-- >>> extract $ dvmap exp b
+-- [1.0,2.7182818284590455,7.38905609893065]
+-- >>> extract $ dvmap sqrt b
 -- [0.0,1.0,1.4142135623730951]
--- >>> let c = vector [2, -1, 4]
--- >>> b + c
+-- >>> let c = vector [2, -1, 4] :: R 3
+-- >>> extract $ b + c
 -- [2.0,0.0,6.0]
 
--- PENDING 477-501
--- >>> let a = build 10 (^3) :: Vector I -- helper function with implicit counter
--- >>> a
--- [0,1,8,27,64,125,216,343,512,729]
--- >>> a ! 2 -- also can do @a `atIndex` 2@
--- 8
--- >>> subVector 2 (5-2) a
--- [8,27,64]
+-- | 477-501
+-- >>> let a = dvmap (^3) (linspace (0,9)) :: R 10
+-- >>> extract a
+-- [0.0,1.0,8.0,27.0,64.0,125.0,216.0,343.0,512.0,729.0]
+-- >>> extract a ! 2         -- also can do @extract a `atIndex` 2@
+-- 8.0
+-- >>> LA.subVector 2 (5-2) (extract a)
+-- [8.0,27.0,64.0]
 
 -- -- that uses @Data.Vector.slice@ underneath, without copying
 -- -- we could convert to a matrix for nice indexing
 -- -- using @(flatten . ((flip (??)) (All, Range 2 1 4)) . asRow) a@
 -- -- we could also do @(flatten . remap (asColumn (scalar 0)) (asRow (fromList [2..4])) . asRow) b@
 -- -- or even @fromList ((sequence . fmap (flip (!))) [2..4] b)@
--- PENDING 477-501
--- >>> let a = build 10 (^3) :: Vector I -- helper function with implicit counter
--- >>> let a' = accum a const (zip [0,2..4] (repeat (negate 1000)))
+-- | 477-501
+-- >>> let a  = fromJust $ create (LA.build 10 (^3)) :: R 10    -- helper function with implicit counter
+-- >>> let a' = LA.accum (extract a) const (zip ([0,2,4]) (repeat (negate 1000)))
 -- >>> a'
--- [-1000,1,-1000,27,-1000,125,216,343,512,729]
--- >>> import qualified Data.Vector.Storable as V
--- >>> V.reverse a' -- unlike in Python, this is not a view, and is O(n)
--- [729,512,343,216,125,-1000,27,-1000,1,-1000]
+-- [-1000.0,1.0,-1000.0,27.0,-1000.0,125.0,216.0,343.0,512.0,729.0]
+--
+-- >>> reverse (LA.toList a') -- unlike in Python, this is not a view, and is O(n)
+-- [729.0,512.0,343.0,216.0,125.0,-1000.0,27.0,-1000.0,1.0,-1000.0]
+--
 -- >>> import Numeric.LinearAlgebra.Devel (mapVectorM_)
--- >>> mapVectorM_ print (cmap (**(1/3.0)) (fromInt a') :: Vector R)
+-- >>> mapVectorM_ print (LA.cmap (**(1/3.0)) a')
 -- NaN
 -- 1.0
 -- NaN
 -- 3.0
 -- NaN
--- 4.999999999999999
+-- 5.0
 -- 6.0
--- 6.999999999999998
--- 8.0
+-- 6.999999999999999
+-- 7.999999999999999
 -- 8.999999999999998
 
 -- PENDING 506-524,531-532
